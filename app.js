@@ -5,7 +5,8 @@ const bodyparser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 main().catch((err) => console.log(err));
 async function main() {
@@ -36,18 +37,21 @@ app.get("/register", (req, res) => {
   res.render("register");
 });
 
-app.post("/register", async (req, res) => {
-  const user = new User({
-    email: req.body.email,
-    password: md5(req.body.password),
+app.post("/register", (req, res) => {
+  bcrypt.hash(req.body.password, saltRounds, async function (err, hash) {
+    // Store hash in your password DB.
+    const user = new User({
+      email: req.body.email,
+      password: hash,
+    });
+    const saveUser = await user.save();
+    console.log(user, saveUser);
+    if (saveUser === user) {
+      res.render("secrets");
+    } else {
+      res.send(saveUser);
+    }
   });
-  const saveUser = await user.save();
-  console.log(user, saveUser);
-  if (saveUser === user) {
-    res.render("secrets");
-  } else {
-    res.send(saveUser);
-  }
 });
 
 app.post("/login", async (req, res) => {
@@ -55,15 +59,19 @@ app.post("/login", async (req, res) => {
   const pwd = req.body.password;
   const mail = await User.findOne({ email: email });
   if (mail) {
-    if (md5(pwd) === mail.password) {
-      res.render("secrets");
-    } else {
-      res.send("Wrong Password");
-    }
+    bcrypt.compare(pwd, mail.password, function (err, result) {
+      // result == true
+      if (result === true) {
+        res.render("secrets");
+      } else {
+        res.send("Wrong Password" + err);
+      }
+    });
   } else {
     res.send("Wrong Email");
   }
 });
+
 //listen port
 app.listen(3000, () => {
   console.log("Server is listening on PORT 3000");
