@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
   password: String,
   googleId: String,
   facebookId: String,
+  secrets: String,
 });
 
 userSchema.plugin(findOrCreate);
@@ -126,15 +127,34 @@ app.get(
   }
 );
 
-app.get("/secrets", (req, res) => {
-  console.log(req.isAuthenticated());
+app.get("/secrets", async (req, res) => {
   if (req.isAuthenticated()) {
     console.log("Logged in");
-    res.render("secrets");
+    let foundUsers = await User.find({ secrets: { $ne: null } });
+    console.log(foundUsers);
+    res.render("secrets", { usersWithSecrets: foundUsers });
   } else {
     res.redirect("/login");
   }
 });
+
+app.get("/submit", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.post("/submit", async (req, res) => {
+  const secret = req.body.secret;
+  console.log(req.user.id, secret);
+  const user = await User.findById(req.user.id);
+  user.secrets = secret;
+  await user.save();
+  res.redirect("/secrets");
+});
+
 app.post("/register", async (req, res) => {
   User.register(
     { username: req.body.username, active: false },
